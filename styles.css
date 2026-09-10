@@ -998,20 +998,42 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
     width: 100% !important; min-width: unset;
     height: 100dvh;
     transform: translateX(-100%);
+    visibility: hidden;
     z-index: 700;
     border-right: none;
-    transition: transform var(--transition-slow);
+    transition: transform var(--transition-slow), visibility var(--transition-slow);
   }
-  #dashboard.open { transform: translateX(0); }
+  #dashboard.open {
+    transform: translateX(0);
+    visibility: visible;
+  }
 
   #stats-panel {
     display: none !important; /* en móvil usamos bottom sheet */
   }
 
   .fab-toggle {
-    display: flex;
-    bottom: 20px;
-    left: 16px;
+    display: flex !important;
+    position: fixed;
+    bottom: 24px;
+    left: 20px;
+    z-index: 650;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+    box-shadow: 0 6px 24px rgba(217, 119, 6, 0.55);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    align-items: center;
+    justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .fab-toggle svg {
+    width: 24px;
+    height: 24px;
+    pointer-events: none;
   }
 
   .map-btn-settings {

@@ -1077,13 +1077,26 @@ function closeStatsPanel() {
 }
 
 function openDashboard() {
-  document.getElementById('dashboard').classList.add('open');
+  const d = document.getElementById('dashboard');
+  if (d) d.classList.add('open');
   STATE.dashboardOpen = true;
+  closeMobileSheet();
+  closeSettingsModal();
 }
 
 function closeDashboard() {
-  document.getElementById('dashboard').classList.remove('open');
+  const d = document.getElementById('dashboard');
+  if (d) d.classList.remove('open');
   STATE.dashboardOpen = false;
+}
+
+function toggleDashboard() {
+  const d = document.getElementById('dashboard');
+  if (d && d.classList.contains('open')) {
+    closeDashboard();
+  } else {
+    openDashboard();
+  }
 }
 
 function openMobileSheet(state = 'open') {
@@ -1346,9 +1359,20 @@ function bindKPIs() {
 // 22. INIT — PUNTO DE ENTRADA
 // ─────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  // Detectar móvil
+  // Detectar móvil y fijar estado inicial
   STATE.isMobile = checkMobile();
-  window.addEventListener('resize', () => { STATE.isMobile = checkMobile(); });
+  if (STATE.isMobile) {
+    closeDashboard();
+  } else {
+    openDashboard();
+  }
+  window.addEventListener('resize', () => {
+    const wasMobile = STATE.isMobile;
+    STATE.isMobile = checkMobile();
+    if (!wasMobile && STATE.isMobile) {
+      closeDashboard();
+    }
+  });
 
   // Iniciar mapa
   initMap();
@@ -1362,19 +1386,37 @@ document.addEventListener('DOMContentLoaded', async () => {
   bindBottomSheetGestures();
 
   // Botones
-  document.getElementById('btn-close-dashboard').addEventListener('click', closeDashboard);
-  document.getElementById('btn-close-stats').addEventListener('click', closeStatsPanel);
+  const btnCloseDash = document.getElementById('btn-close-dashboard');
+  if (btnCloseDash) {
+    btnCloseDash.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      closeDashboard();
+    });
+  }
+
+  const btnCloseStats = document.getElementById('btn-close-stats');
+  if (btnCloseStats) {
+    btnCloseStats.addEventListener('click', closeStatsPanel);
+  }
+
   const btnCloseMobile = document.getElementById('btn-close-mobile-sheet');
   if (btnCloseMobile) {
     btnCloseMobile.addEventListener('click', (e) => {
       e.stopPropagation();
+      e.preventDefault();
       closeMobileSheet();
     });
   }
-  document.getElementById('fab-dashboard').addEventListener('click', () => {
-    STATE.dashboardOpen ? closeDashboard() : openDashboard();
-    STATE.dashboardOpen = !STATE.dashboardOpen;
-  });
+
+  const btnFab = document.getElementById('fab-dashboard');
+  if (btnFab) {
+    btnFab.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      toggleDashboard();
+    });
+  }
   document.getElementById('btn-refresh').addEventListener('click', reloadContenedores);
   document.getElementById('btn-clear-filters').addEventListener('click', clearAllFilters);
   document.getElementById('btn-pdf-lista').addEventListener('click', generateListaPDF);
