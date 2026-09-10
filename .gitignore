@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.system_generated/
+*.log
+
+desktop.ini
+*/desktop.ini

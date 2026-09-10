@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Visor Cartográfico · Archena · Contenedores y Papeleras</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <!-- Turf.js for spatial buffering and geometric polygons -->
+  <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <!-- Visor CSS -->
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- ===== LOADING OVERLAY ===== -->
+  <div id="loading-overlay">
+    <div class="loader-content">
+      <div class="loader-spinner"></div>
+      <div class="loader-text">Cargando datos del municipio<span class="loader-dots"></span></div>
+      <div class="loader-sub" id="loader-progress">Iniciando conexión OGC API</div>
+    </div>
+  </div>
+
+  <!-- ===== LAYOUT PRINCIPAL ===== -->
+  <div id="app-layout">
+
+    <!-- ========= SIDEBAR IZQUIERDO — DASHBOARD ========= -->
+    <aside id="dashboard" class="panel glass-panel">
+
+      <!-- Cabecera del Dashboard -->
+      <div class="panel-header">
+        <div class="panel-brand">
+          <img src="assets/logo.png" alt="Tesela Estudio" class="brand-logo" />
+          <div class="brand-title">
+            <span class="brand-name">Archena</span>
+            <span class="brand-sub">Contenedores y Papeleras</span>
+          </div>
+        </div>
+        <button class="btn-icon" id="btn-close-dashboard" title="Cerrar panel" aria-label="Cerrar dashboard">
+          <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Indicador de estado en vivo -->
+      <div class="live-status" id="live-status">
+        <span class="live-dot" id="live-dot"></span>
+        <span class="live-text" id="live-text">Conectando...</span>
+        <button class="btn-refresh" id="btn-refresh" title="Recargar datos">
+          <svg viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        </button>
+      </div>
+
+      <!-- Buscador -->
+      <div class="search-container sticky-top">
+        <div class="search-input-wrap">
+          <svg class="search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input
+            type="text"
+            id="search-input"
+            placeholder="Buscar por código..."
+            autocomplete="off"
+          />
+          <button class="btn-clear-search" id="btn-clear-search" title="Limpiar búsqueda" style="display:none">
+            <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- TABS DE NAVEGACIÓN -->
+      <div class="tab-nav">
+        <button class="tab-btn active" data-tab="filtros">
+          <svg viewBox="0 0 24 24"><path d="M3 4h18M7 8h10M11 12h2"/></svg>
+          Filtros
+        </button>
+        <button class="tab-btn" data-tab="lista">
+          <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+          Lista
+        </button>
+        <button class="tab-btn" data-tab="calendario">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          Calendario
+        </button>
+      </div>
+
+      <!-- ====== TAB: FILTROS ====== -->
+      <div class="tab-content active" id="tab-filtros">
+
+        <!-- KPIs -->
+        <div class="kpis-grid" id="kpis-grid">
+          <div class="kpi-card" data-filter-tipo="all" id="kpi-total">
+            <div class="kpi-value" id="kpi-total-val">—</div>
+            <div class="kpi-label">Total</div>
+          </div>
+          <div class="kpi-card kpi-resto" data-filter-tipo="Resto" id="kpi-resto">
+            <div class="kpi-value" id="kpi-resto-val">—</div>
+            <div class="kpi-label">Resto</div>
+          </div>
+          <div class="kpi-card kpi-vidrio" data-filter-tipo="Vidrio" id="kpi-vidrio">
+            <div class="kpi-value" id="kpi-vidrio-val">—</div>
+            <div class="kpi-label">Vidrio</div>
+          </div>
+          <div class="kpi-card kpi-papel" data-filter-tipo="Papel y carton" id="kpi-papel">
+            <div class="kpi-value" id="kpi-papel-val">—</div>
+            <div class="kpi-label">Papel</div>
+          </div>
+          <div class="kpi-card kpi-envases" data-filter-tipo="Envases" id="kpi-envases">
+            <div class="kpi-value" id="kpi-envases-val">—</div>
+            <div class="kpi-label">Envases</div>
+          </div>
+          <div class="kpi-card kpi-organico" data-filter-tipo="(Resto y organico)" id="kpi-organico">
+            <div class="kpi-value" id="kpi-organico-val">—</div>
+            <div class="kpi-label">Orgánico</div>
+          </div>
+        </div>
+
+        <!-- Filtro por tipo — barra visual acumulada -->
+        <div class="filter-section">
+          <div class="filter-title">Tipo de residuo</div>
+          <div class="tipo-chart" id="tipo-chart"></div>
+        </div>
+
+        <!-- Filtro por sistema de recogida -->
+        <div class="filter-section">
+          <div class="filter-title">Sistema de recogida</div>
+          <div class="filter-pills" id="filter-sistema">
+            <button class="pill active" data-value="all">Todos</button>
+          </div>
+        </div>
+
+        <!-- Filtro por color -->
+        <div class="filter-section">
+          <div class="filter-title">Color del contenedor</div>
+          <div class="filter-pills" id="filter-color">
+            <button class="pill active" data-value="all">Todos</button>
+          </div>
+        </div>
+
+        <!-- Filtro por usuario -->
+        <div class="filter-section">
+          <div class="filter-title">Técnico de campo</div>
+          <div class="filter-pills" id="filter-usuario">
+            <button class="pill active" data-value="all">Todos</button>
+          </div>
+        </div>
+
+        <!-- Botón limpiar filtros -->
+        <button class="btn-secondary full-width" id="btn-clear-filters">
+          <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+          Limpiar filtros
+        </button>
+
+      </div>
+
+      <!-- ====== TAB: LISTA ====== -->
+      <div class="tab-content" id="tab-lista">
+        <div class="lista-header">
+          <span class="lista-count" id="lista-count">— elementos</span>
+          <button class="btn-pdf" id="btn-pdf-lista">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            Exportar PDF
+          </button>
+        </div>
+        <div class="lista-scroll" id="lista-scroll">
+          <div class="lista-items" id="lista-items">
+            <!-- Generado dinámicamente -->
+          </div>
+        </div>
+      </div>
+
+      <!-- ====== TAB: CALENDARIO ====== -->
+      <div class="tab-content" id="tab-calendario">
+        <div class="calendar-header">
+          <button class="btn-icon" id="cal-prev">
+            <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <span class="calendar-month-title" id="cal-month-title"></span>
+          <button class="btn-icon" id="cal-next">
+            <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+        <div class="calendar-grid" id="calendar-grid"></div>
+        <div class="calendar-legend">
+          <div class="cal-legend-item">
+            <div class="cal-dot dot-incidencia"></div>
+            <span>Incidencias</span>
+          </div>
+        </div>
+        <div class="calendar-notice">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <p>La capa de <strong>incidencias</strong> está pendiente de publicar en Mergin Maps. El calendario se activará automáticamente cuando esté disponible.</p>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- ========= MAPA CENTRAL ========= -->
+    <main id="map-container">
+      <div id="map"></div>
+
+      <!-- Botón flotante de menú (móvil) -->
+      <button class="fab-toggle" id="fab-dashboard" aria-label="Abrir dashboard">
+        <svg viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+
+      <!-- Botón flotante de Ajustes de Mapa -->
+      <button class="map-btn-settings" id="btn-map-settings" title="Ajustes de mapa y saturación" aria-label="Ajustes de mapa">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+
+      <!-- Modal / Panel de Ajustes de Mapa -->
+      <div class="settings-modal glass-panel" id="settings-modal" aria-hidden="true">
+        <div class="settings-header">
+          <div class="settings-title">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            Ajustes de visualización
+          </div>
+          <button class="btn-icon" id="btn-close-settings" title="Cerrar ajustes" aria-label="Cerrar ajustes">
+            <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <!-- Slider de Saturación -->
+        <div class="settings-group">
+          <div class="settings-label-row">
+            <span class="settings-label">Saturación de capa base</span>
+            <span class="settings-val-badge" id="val-saturation">40%</span>
+          </div>
+          <div class="slider-wrap">
+            <input type="range" id="slider-saturation" min="0" max="200" value="40" step="5" />
+          </div>
+          <div class="slider-presets">
+            <button class="preset-btn" data-val="0">0% (B/N)</button>
+            <button class="preset-btn active" data-val="40">40% (Por defecto)</button>
+            <button class="preset-btn" data-val="100">100% (Real)</button>
+          </div>
+        </div>
+
+        <!-- Selector de Capa Base -->
+        <div class="settings-group">
+          <div class="settings-label">Capa de mapa base</div>
+          <div class="basemap-grid" id="basemap-selector">
+            <button class="basemap-opt active" data-layer="googleSat">
+              <span class="basemap-icon">🛰️</span>
+              <span class="basemap-text">Google Satélite</span>
+            </button>
+            <button class="basemap-opt" data-layer="cartoDark">
+              <span class="basemap-icon">🌑</span>
+              <span class="basemap-text">CartoDB Oscuro</span>
+            </button>
+            <button class="basemap-opt" data-layer="cartoLight">
+              <span class="basemap-icon">☀️</span>
+              <span class="basemap-text">CartoDB Claro</span>
+            </button>
+            <button class="basemap-opt" data-layer="pnoa">
+              <span class="basemap-icon">🇪🇸</span>
+              <span class="basemap-text">PNOA Ortofoto</span>
+            </button>
+            <button class="basemap-opt" data-layer="osm">
+              <span class="basemap-icon">🌐</span>
+              <span class="basemap-text">OpenStreetMap</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Leyenda del mapa -->
+      <div class="map-legend glass-panel" id="map-legend">
+        <div class="legend-title">Leyenda</div>
+        <div class="legend-item"><span class="legend-dot dot-resto"></span> Resto</div>
+        <div class="legend-item"><span class="legend-dot dot-vidrio"></span> Vidrio</div>
+        <div class="legend-item"><span class="legend-dot dot-papel"></span> Papel y Cartón</div>
+        <div class="legend-item"><span class="legend-dot dot-envases"></span> Envases</div>
+        <div class="legend-item"><span class="legend-dot dot-organico"></span> Orgánico / Resto+Org.</div>
+        <div class="legend-item"><span class="legend-poly poly-viario"></span> Viario (Calzada)</div>
+        <div class="legend-item"><span class="legend-poly poly-peatonal"></span> Zonas peatonales</div>
+      </div>
+
+      <!-- Control de capas -->
+      <div class="layer-control glass-panel" id="layer-control">
+        <div class="legend-title">Capas</div>
+        <label class="layer-toggle"><input type="checkbox" id="layer-contenedores" checked /> Contenedores</label>
+        <label class="layer-toggle"><input type="checkbox" id="layer-viario" checked /> Viario (Calzada)</label>
+        <label class="layer-toggle"><input type="checkbox" id="layer-peatonal" checked /> Viario peatonal</label>
+        <label class="layer-toggle"><input type="checkbox" id="layer-municipio" checked /> Municipio</label>
+      </div>
+
+    </main>
+
+    <!-- ========= PANEL DERECHO — FICHA ELEMENTO ========= -->
+    <aside id="stats-panel" class="panel glass-panel" aria-hidden="true">
+
+      <div class="panel-header">
+        <div class="panel-title">
+          <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          Ficha del elemento
+        </div>
+        <button class="btn-icon" id="btn-close-stats" title="Cerrar ficha">
+          <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="stats-content" id="stats-content">
+        <div class="stats-placeholder">
+          <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          <p>Haz clic en un contenedor para ver su ficha</p>
+        </div>
+      </div>
+
+      <div class="stats-footer" id="stats-footer" style="display:none">
+        <button class="btn-primary" id="btn-pdf-elemento">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Exportar ficha PDF
+        </button>
+        <button class="btn-secondary" id="btn-zoom-elemento">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+          Centrar en mapa
+        </button>
+      </div>
+
+    </aside>
+
+  </div>
+
+  <!-- ===== MOBILE BOTTOM SHEETS ===== -->
+  <!-- Stats bottom sheet en móvil -->
+  <div id="mobile-stats-sheet" class="bottom-sheet glass-panel" aria-hidden="true">
+    <div class="sheet-header">
+      <div class="sheet-handle"></div>
+      <button class="btn-close-sheet" id="btn-close-mobile-sheet" title="Cerrar panel" aria-label="Cerrar panel">
+        <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="sheet-content" id="mobile-stats-content"></div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <!-- App JS -->
+  <script src="app.js"></script>
+
+</body>
+</html>
